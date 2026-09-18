@@ -986,6 +986,11 @@
       sheetsUsed++;
 
       let currentRegion = null;
+      // Entities that sit outside the geographic regions: Campuchia (listed just before the
+      // closing "Tổng số") and the subsidiary/company rows listed after it. Collect them all
+      // under one "Khác" region instead of dropping them.
+      const OTHER_REGION = 'Khác';
+      let inOtherBlock = false;
       for (let r = totalRowIdx+1; r < aoa.length; r++){
         const rowArr = aoa[r] || [];
         const colA = rowArr[0], colB = rowArr[1];
@@ -994,9 +999,17 @@
           currentRegion = (typeof colB === 'string') ? colB.trim() : colB;
           continue;
         }
-        if (typeof colB === 'string' && colB.trim() === 'Tổng số') break; // stray second total = end of data
+        // The closing "Tổng số" ends the regional block; everything after it is the
+        // subsidiaries block. Rows with no real numbers are dropped further below anyway.
+        if (typeof colB === 'string' && colB.trim() === 'Tổng số'){
+          inOtherBlock = true;
+          currentRegion = OTHER_REGION;
+          continue;
+        }
         const isBranchIdx = (typeof colA === 'number') || (typeof colA === 'string' && /^\d+$/.test(colA.trim()));
-        if (isBranchIdx && currentRegion && typeof colB === 'string' && colB.trim()){
+        const nameIsOther = (typeof colB === 'string') && stripDiacritics(colB).trim() === 'campuchia';
+        if (nameIsOther) currentRegion = OTHER_REGION;
+        if ((isBranchIdx || inOtherBlock) && currentRegion && typeof colB === 'string' && colB.trim()){
           const branchName = colB.trim();
           if (!(currentRegion in regionIdx)){
             regionIdx[currentRegion] = regionList.length;
